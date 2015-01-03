@@ -79,6 +79,7 @@ namespace BASeCamp.XMLSerialization
             }
             return null;
         }
+
         /// <summary>
         /// reads a System.Array from the given XElement.
         /// </summary>
@@ -119,13 +120,14 @@ namespace BASeCamp.XMLSerialization
                 }
 
                 //alright- first, read in this element.
-                T readresult = StandardHelper.LoadElement<T>(ReadElement.Descendants().First());
+                T readresult = StandardHelper.ReadElement<T>(ReadElement.Descendants().First());
                 //once read, assign it to the appropriate array index.
                 BuildArray.SetValue((object) readresult, elementindex);
             }
             //assigned successfully- return result.
             return BuildArray;
         }
+
         /// <summary>
         /// Saves a System.Array into a XElement XML Node with the specified node name and returns the result.
         /// </summary>
@@ -135,8 +137,8 @@ namespace BASeCamp.XMLSerialization
         /// <returns></returns>
         public static XElement SaveArray(System.Array pArrayData, String pNodeName)
         {
-            if(pArrayData==null) throw new ArgumentNullException("pArrayData");
-            if(pNodeName==null) throw new ArgumentNullException("pNodeName");
+            if (pArrayData == null) throw new ArgumentNullException("pArrayData");
+            if (pNodeName == null) throw new ArgumentNullException("pNodeName");
             XElement BuildResult = new XElement(pNodeName);
             //dimensions get's saved as a attribute.
             BuildResult.Add(new XAttribute("Rank", pArrayData.Rank));
@@ -175,7 +177,7 @@ namespace BASeCamp.XMLSerialization
                     }
                 }
                 if (atMax) break;
-             
+
                 //set carry bit.
                 //iterate from the first index to the last index.
                 //if carry bit is true
@@ -218,10 +220,10 @@ namespace BASeCamp.XMLSerialization
             return SaveList<T>(buildfunc, pNodeName, SourceData);
         }
 
-        public static List<T> LoadList<T>(XElement Source)
+        public static List<T> ReadList<T>(XElement Source)
         {
-            Func<XElement, T> constructitem = (xdata) => LoadElement<T>(xdata);
-            return LoadList<T>(constructitem, Source);
+            Func<XElement, T> constructitem = (xdata) => ReadElement<T>(xdata);
+            return ReadList<T>(constructitem, Source);
         }
 
         public static XElement SaveElement<T>(T SourceData, String pNodeName)
@@ -263,15 +265,15 @@ namespace BASeCamp.XMLSerialization
             return buildfunc(SourceData);
         }
 
-        public static Object LoadElement(Type sTargetType, XElement Source)
+        public static Object ReadElement(Type sTargetType, XElement Source)
         {
-            var elementmethod = typeof (StandardHelper).GetMethod("LoadElement", new Type[] {typeof (XElement)});
+            var elementmethod = typeof (StandardHelper).GetMethod("ReadElement", new Type[] {typeof (XElement)});
             var buildcall = elementmethod.MakeGenericMethod(new Type[] {sTargetType});
             Object callresult = buildcall.Invoke(null, new object[] {Source});
             return callresult;
         }
 
-        public static T LoadElement<T>(XElement XMLSource)
+        public static T ReadElement<T>(XElement XMLSource)
         {
             Func<XElement, T> constructitem = null;
             bool implementsInterface = false;
@@ -329,7 +331,7 @@ namespace BASeCamp.XMLSerialization
             return ListNode;
         }
 
-        public static List<T> LoadList<T>(Func<XElement, T> ListLoader, XElement Source)
+        public static List<T> ReadList<T>(Func<XElement, T> ListLoader, XElement Source)
         {
             List<T> resultlist = new List<T>();
             foreach (XElement child in Source.DescendantNodes())
@@ -839,14 +841,20 @@ namespace BASeCamp.XMLSerialization
         {
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
-            return StandardHelper.LoadElement(ReadType, src);
+            return StandardHelper.ReadElement(ReadType, src);
         }
 
         public static T ReadElement<T>(this XElement src, String pElementName, T Default = default(T))
         {
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
-            return StandardHelper.LoadElement<T>(NodeCheck);
+            return StandardHelper.ReadElement<T>(NodeCheck);
+        }
+        public static System.Array ReadArray<T>(this XElement src,String pElementName,System.Array Default=null)
+        {
+            XElement NodeCheck = src.Element(pElementName);
+            if(NodeCheck==null) return Default;
+            return StandardHelper.ReadArray<T>(NodeCheck);
         }
     }
 }
