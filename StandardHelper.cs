@@ -856,5 +856,11 @@ namespace BASeCamp.XMLSerialization
             if(NodeCheck==null) return Default;
             return StandardHelper.ReadArray<T>(NodeCheck);
         }
+        public static List<T> ReadList<T>(this XElement src,String pElementName,List<T> Default = null)
+        {
+            XElement NodeCheck = src.Element(pElementName);
+            if (NodeCheck == null) return Default;
+            return StandardHelper.ReadList<T>(NodeCheck);
+        }
     }
 }
