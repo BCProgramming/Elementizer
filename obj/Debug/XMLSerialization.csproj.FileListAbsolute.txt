@@ -1,5 +1,0 @@
-C:\Users\BC_Programming\Documents\Visual Studio 2008\Projects\BASeBlocks\XMLSerialization\obj\Debug\XMLSerialization.csprojResolveAssemblyReference.cache
-C:\Users\BC_Programming\Documents\Visual Studio 2008\Projects\BASeBlocks\XMLSerialization\bin\Debug\XMLSerialization.dll
-C:\Users\BC_Programming\Documents\Visual Studio 2008\Projects\BASeBlocks\XMLSerialization\bin\Debug\XMLSerialization.pdb
-C:\Users\BC_Programming\Documents\Visual Studio 2008\Projects\BASeBlocks\XMLSerialization\obj\Debug\XMLSerialization.dll
-C:\Users\BC_Programming\Documents\Visual Studio 2008\Projects\BASeBlocks\XMLSerialization\obj\Debug\XMLSerialization.pdb
