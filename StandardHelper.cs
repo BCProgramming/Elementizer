@@ -40,14 +40,17 @@ namespace BASeCamp.XMLSerialization
             {typeof (Single), Static},
             {typeof (Double), Static},
             {typeof (Decimal), Static},
+            {typeof (Boolean), Static},
             {typeof (String), Static},
             {typeof (Font), Static},
             {typeof (ColorMatrix), Static},
             {typeof (Matrix), Static},
             {typeof (SolidBrush), Static},
             {typeof (TextureBrush), Static},
+            {typeof (LinearGradientBrush), Static},
             {typeof (Blend), Static},
-            {typeof (ColorBlend), Static}
+            {typeof (ColorBlend), Static},
+            {typeof (Color), Static}
         };
 
 
@@ -289,6 +292,7 @@ namespace BASeCamp.XMLSerialization
                 //if it implements the interface, we'll use the constructor..
                 constructitem = (xdata) =>
                 {
+                    
                     ConstructorInfo ci = typeof (T).GetConstructor(new Type[] {typeof (XElement)});
                     if (ci == null) return default(T);
                     return (T) ci.Invoke(new object[] {xdata});
@@ -675,7 +679,7 @@ namespace BASeCamp.XMLSerialization
         {
             if (pNodeName == null) pNodeName = "Rectangle";
             return new XElement
-                ("Rectangle",
+                (pNodeName,
                     new XAttribute("Left", sourceItem.Left), new XAttribute("Top", sourceItem.Top), new XAttribute("Width", sourceItem.Width),
                     new XAttribute("Height", sourceItem.Height));
         }
@@ -711,7 +715,7 @@ namespace BASeCamp.XMLSerialization
         {
             if (pNodeName == null) pNodeName = "Rectangle";
             return new XElement
-                ("Rectangle",
+                (pNodeName,
                     new XAttribute("Left", sourceItem.Left), new XAttribute("Top", sourceItem.Top), new XAttribute("Width", sourceItem.Width),
                     new XAttribute("Height", sourceItem.Height));
         }
