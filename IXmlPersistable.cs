@@ -5,7 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Xml.Linq;
 
-namespace BASeCamp.XMLSerialization
+namespace BASeCamp.Elementizer
 {
     /// <summary>
     /// Indicates a object supports our XElement Serialization, serializing to an XElement.

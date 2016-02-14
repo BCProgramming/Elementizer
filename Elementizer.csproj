@@ -7,8 +7,8 @@
     <ProjectGuid>{850A1563-AC23-4B60-BBCF-503B2BB69547}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>XMLSerialization</RootNamespace>
-    <AssemblyName>XMLSerialization</AssemblyName>
+    <RootNamespace>BASeCamp.Elementizer</RootNamespace>
+    <AssemblyName>Elementizer</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>

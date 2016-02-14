@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -10,9 +12,9 @@ using System.Runtime.CompilerServices;
 using System.Security;
 using System.Text;
 using System.Xml.Linq;
-using XMLSerialization;
 
-namespace BASeCamp.XMLSerialization
+
+namespace BASeCamp.Elementizer
 {
     public class StandardHelper : IXmlPersistableProvider<Point>, IXmlPersistableProvider<PointF>,
         IXmlPersistableProvider<Rectangle>, IXmlPersistableProvider<RectangleF>,
@@ -21,7 +23,7 @@ namespace BASeCamp.XMLSerialization
         IXmlPersistableProvider<System.Boolean>, IXmlPersistableProvider<Color>,
         IXmlPersistableProvider<Font>, IXmlPersistableProvider<ColorMatrix>,
         IXmlPersistableProvider<SolidBrush>, IXmlPersistableProvider<TextureBrush>, IXmlPersistableProvider<LinearGradientBrush>,
-        IXmlPersistableProvider<Matrix>, IXmlPersistableProvider<Blend>, IXmlPersistableProvider<ColorBlend>
+        IXmlPersistableProvider<Matrix>, IXmlPersistableProvider<Blend>, IXmlPersistableProvider<ColorBlend>,IXmlPersistableProvider<IDictionary>,IXmlPersistableProvider<IList>
     {
         public static StandardHelper Static = new StandardHelper();
 
@@ -50,7 +52,9 @@ namespace BASeCamp.XMLSerialization
             {typeof (LinearGradientBrush), Static},
             {typeof (Blend), Static},
             {typeof (ColorBlend), Static},
-            {typeof (Color), Static}
+            {typeof (Color), Static},
+            {typeof(IDictionary),Static},
+            {typeof(IList),Static}
         };
 
 
@@ -62,7 +66,7 @@ namespace BASeCamp.XMLSerialization
             }
             SerializationHelpers.Add(typeof (T), Provider);
         }
-
+       
         public static IXmlPersistableProvider<T> GetHelper<T>()
         {
             Type gettype = typeof (T);
@@ -70,8 +74,14 @@ namespace BASeCamp.XMLSerialization
             {
                 if (iterate.IsInterface)
                 {
+                    //if it is the interface, we want to return it as well.
+                    if(gettype==iterate)
+                    {
+                        return (IXmlPersistableProvider<T>)SerializationHelpers[iterate];
+                    }
                     foreach (Type checkinterface in gettype.GetInterfaces())
                     {
+                        
                         if (checkinterface.Equals(gettype))
                             return (IXmlPersistableProvider<T>) SerializationHelpers[iterate];
                     }
@@ -82,7 +92,12 @@ namespace BASeCamp.XMLSerialization
             }
             return null;
         }
-
+        public static Type DefaultClassFinder(String pTypeName)
+        {
+            return Type.GetType(pTypeName);
+        }
+        public delegate Type ClassFinderRoutine(String pTypeName);
+        public static ClassFinderRoutine ClassFinder = DefaultClassFinder;
         /// <summary>
         /// reads a System.Array from the given XElement.
         /// </summary>
@@ -92,8 +107,13 @@ namespace BASeCamp.XMLSerialization
         public static System.Array ReadArray<T>(XElement SourceElement)
         {
             //read the "rank" attribute.
+            if (SourceElement.Attribute("Rank") == null) return Array.CreateInstance(typeof(T), 0);
             int ArrayRank = SourceElement.GetAttributeInt("Rank");
-
+            if(SourceElement.Attribute("IsNull")!=null)
+            {
+                bool isNull = SourceElement.GetAttributeBool("IsNull");
+                if (isNull) return null;
+            }
             int[] DimensionSizes = new int[ArrayRank];
             //now get the Dimensions
 
@@ -130,6 +150,114 @@ namespace BASeCamp.XMLSerialization
             //assigned successfully- return result.
             return BuildArray;
         }
+        public static XElement SaveDictionary(IDictionary Source,String pNodeName)
+        {
+            if (Source == null) throw new ArgumentNullException("Source");
+            if (pNodeName == null) throw new ArgumentNullException("pNodeName");
+            XElement BuildResult = new XElement(pNodeName);
+
+            
+            foreach (var keyiterate in Source.Keys)
+            {
+                Object ValueItem = Source[keyiterate];
+                MethodInfo SaveElementMethod = typeof(StandardHelper).GetMethod("SaveElementTypeReturn");
+                
+                MethodInfo KeyMethod = SaveElementMethod.MakeGenericMethod(keyiterate.GetType());
+                MethodInfo ValueMethod = SaveElementMethod.MakeGenericMethod(ValueItem.GetType());
+                object[] keyparams = new object[] { keyiterate, "Key", null };
+                object[] valueparams = new object[] {ValueItem,"Value",null};
+                XElement KeyData = (XElement)KeyMethod.Invoke(null,keyparams);
+                XElement ValueData = (XElement)ValueMethod.Invoke(null,valueparams);
+
+                Type KeyResultType = (Type)keyparams[2];
+                Type ValueResultType = (Type)valueparams[2];
+
+                KeyData.Add(new XAttribute("Type",(KeyResultType ?? keyiterate.GetType()).FullName));
+                ValueData.Add(new XAttribute("Type", (ValueResultType ?? ValueItem.GetType()).FullName));
+                BuildResult.Add(new XElement("DictionaryItem",KeyData,ValueData));
+               
+                
+            }
+            return BuildResult;
+        }
+        public static IDictionary ReadDictionary(XElement SourceNode)
+        {
+            Type KeyType = null;
+            Type ValueType = null;
+            IDictionary ResultDictionary = null;
+            foreach(var DictionaryItem in SourceNode.Descendants("DictionaryItem"))
+            {
+                XElement KeyNode = DictionaryItem.Descendants("Key").FirstOrDefault();
+                XElement ValueNode = DictionaryItem.Descendants("Value").FirstOrDefault();
+                //each one should have a "Type" attribute.
+                if(KeyType==null)
+                {
+                    String KeyTypeName = KeyNode.GetAttributeString("Type");
+                    String ValueTypeName = ValueNode.GetAttributeString("Type");
+                    KeyType = Type.GetType(KeyTypeName);
+                    ValueType = Type.GetType(ValueTypeName);
+
+                    Type dictionaryType = typeof(Dictionary<,>);
+                    Type GenericDictionaryType = dictionaryType.MakeGenericType(KeyType, ValueType);
+                    ConstructorInfo dictionaryconstructor = GenericDictionaryType.GetConstructor(new Type[]{});
+                    ResultDictionary = (IDictionary)dictionaryconstructor.Invoke(null);
+                    
+
+                }
+                Object KeyValue = ReadElement(KeyType, KeyNode);
+                Object ValueValue = ReadElement(ValueType, ValueNode);
+                ResultDictionary.Add(KeyValue,ValueValue);
+
+            }
+            return ResultDictionary;
+        }
+        public static XElement SaveDictionary<TKey,TValue>(Dictionary<TKey,TValue> Source,String pNodeName)
+        {
+            //format is a list of subnodes- "<DictionaryItem><Key /><Value /></DictionaryItem>
+            if(Source==null) throw new ArgumentNullException("Source");
+            if(pNodeName==null) throw new ArgumentNullException("pNodeName");
+            XElement BuildResult = new XElement(pNodeName);
+            foreach(KeyValuePair<TKey,TValue> kvp in Source)
+            {
+                Type StoredKeyType = null;
+                Type StoredValueType = null;
+                TKey keyval = kvp.Key;
+                XElement SavedKey = SaveElementTypeReturn(keyval, "Key",out StoredKeyType);
+                XElement SavedValue = SaveElementTypeReturn(kvp.Value, "Value",out StoredValueType);
+                if(!(keyval.GetType() == StoredKeyType))
+                {
+                    //if different, store in the Element.
+                    SavedKey.Add(new XAttribute("TypeName",StoredKeyType.FullName));
+                }
+                if(!(kvp.Value.GetType() == StoredValueType))
+                {
+                    SavedValue.Add(new XAttribute("TypeName",StoredValueType.FullName));
+                }
+                BuildResult.Add(new XElement("DictionaryItem",SavedKey,SavedValue));
+            }
+            return BuildResult;
+        }
+        public static Dictionary<TKey,TValue> ReadDictionary<TKey,TValue>(XElement Source)
+        {
+            Dictionary<TKey, TValue> BuildResult = new Dictionary<TKey, TValue>();
+
+            foreach(var subnode in Source.Descendants("DictionaryItem"))
+            {
+                //each DictionaryItem node has a "Key" node and a "Value" node.
+                XElement KeyNode = subnode.Descendants("Key").FirstOrDefault();
+                XElement ValueNode = subnode.Descendants("Value").FirstOrDefault();
+                //note: added logic. we need to manually check the KeyNode and ValueNode ourselves, and see if it has a TypeName Attribute.
+                //if it does, we need to call with that type, rather than typeof(TKey).
+                Object KeyValue = ReadElement(typeof(TKey), KeyNode);
+                Object ValueValue = ReadElement(typeof(TValue), ValueNode);
+                BuildResult.Add((TKey)KeyValue, (TValue)ValueValue);
+            }
+
+            return BuildResult;
+
+
+        }
+
 
         /// <summary>
         /// Saves a System.Array into a XElement XML Node with the specified node name and returns the result.
@@ -140,9 +268,14 @@ namespace BASeCamp.XMLSerialization
         /// <returns></returns>
         public static XElement SaveArray(System.Array pArrayData, String pNodeName)
         {
-            if (pArrayData == null) throw new ArgumentNullException("pArrayData");
+            
             if (pNodeName == null) throw new ArgumentNullException("pNodeName");
             XElement BuildResult = new XElement(pNodeName);
+            if (pArrayData == null)
+            {
+                BuildResult.Add(new XAttribute("IsNull",true));
+                  return BuildResult;
+            }
             //dimensions get's saved as a attribute.
             BuildResult.Add(new XAttribute("Rank", pArrayData.Rank));
             //now we have a  Set of "Dimension" Elements, each filled with the elements for that rank.
@@ -165,7 +298,7 @@ namespace BASeCamp.XMLSerialization
                 //for the Generic Method using the Type of the System.Array Element Type we were passed.
                 MethodInfo GenericCall = typeof (StandardHelper).GetMethod("SaveElement").MakeGenericMethod(pArrayData.GetType().GetElementType());
 
-                XElement ElementBuilt = (XElement) GenericCall.Invoke(null, new object[] {pArrayData.GetValue(indices), (Object) "Data"});
+                XElement ElementBuilt = (XElement) GenericCall.Invoke(null, new object[] {pArrayData.GetValue(indices), (Object) "Data",false});
                 //add the element, tagged with the Indices.
                 DimensionElement.Add(new XElement("Element", new XAttribute("Index", String.Join(",", from p in indices select p.ToString())), ElementBuilt));
 
@@ -212,29 +345,25 @@ namespace BASeCamp.XMLSerialization
             return BuildResult;
         }
 
-        public static XElement SaveList<T>(List<T> SourceData, String pNodeName)
+
+        public static XElement SaveElement<T>(T SourceData, String pNodeName,bool IncludeTypeInfo=false)
         {
-            //without a Func as in the overload, we'll try to "build" our own function.
-            //the function we build will close over a instance of IXMLSerializationProvider (or the type GetXMLData method if it implements IXMLSerializable).
-            //basically we want to create the function to handle the loading of classes that implement the interface or have a defined provider.
+            Type storedType = null;
+            XElement elementresult = SaveElementTypeReturn<T>(SourceData, pNodeName, out storedType);
+            if(IncludeTypeInfo)
+                elementresult.Add(new XAttribute("Type",SourceData.GetType().Name));
 
-            Func<T, XElement> buildfunc = (elem) => SaveElement(elem, pNodeName);
-
-            return SaveList<T>(buildfunc, pNodeName, SourceData);
+            return elementresult;
         }
-
-        public static List<T> ReadList<T>(XElement Source)
+        public static XElement SaveElementTypeReturn<T>(T SourceData, String pNodeName,out Type pStoredType)
         {
-            Func<XElement, T> constructitem = (xdata) => ReadElement<T>(xdata);
-            return ReadList<T>(constructitem, Source);
-        }
-
-        public static XElement SaveElement<T>(T SourceData, String pNodeName)
-        {
+            pStoredType = typeof(T);
             if (typeof (T).IsArray)
             {
                 return SaveArray((System.Array) (Object) SourceData, pNodeName);
             }
+            
+            
             bool implementsInterface = false;
             Func<T, XElement> buildfunc = null;
             foreach (var searchinterface in typeof (T).GetInterfaces())
@@ -252,9 +381,32 @@ namespace BASeCamp.XMLSerialization
             else
             {
                 //otherwise, let's see if there is an XMLProvider we can use.
+                //we need to search through the type itself...
                 var retrievehelper = GetHelper<T>();
                 if (retrievehelper == null)
                 {
+                    MethodInfo GenHelperMethod = typeof(StandardHelper).GetMethod("GetHelper");
+                    //no dice? Alright, now we need to try to retrieve any helper for the interfaces implemented by that type.
+                    foreach(var loopinterface in typeof(T).GetInterfaces())
+                    {
+                        MethodInfo CallableGetHelper = GenHelperMethod.MakeGenericMethod(new Type[] { loopinterface });
+                        var result = CallableGetHelper.Invoke(null, new object[]{});
+                        if(result!=null)
+                        {
+                            pStoredType = loopinterface;
+                            Type GenericProviderType = typeof(IXmlPersistableProvider<>);
+                            //we have the type, create the generic type definition...
+                            Type ProviderType = GenericProviderType.MakeGenericType(loopinterface);
+                            //now we want to call SerializeObject on the result, which will be this type.
+                            MethodInfo SerializeObjectMethod = ProviderType.GetMethod("SerializeObject");
+                            buildfunc = (elem) =>
+                            {
+                                return (XElement)(SerializeObjectMethod.Invoke(result, new object[] { elem, pNodeName }));
+                            };
+                            break;
+                        }
+
+                    }
                 }
                 else
                 {
@@ -292,9 +444,17 @@ namespace BASeCamp.XMLSerialization
                 //if it implements the interface, we'll use the constructor..
                 constructitem = (xdata) =>
                 {
-                    
-                    ConstructorInfo ci = typeof (T).GetConstructor(new Type[] {typeof (XElement)});
-                    if (ci == null) return default(T);
+                    Type BuildType = typeof(T);
+                    if(XMLSource.Attribute("Type")!=null)
+                    {
+                        BuildType = ClassFinder(XMLSource.Attribute("Type").Value);
+                    }
+                    ConstructorInfo ci = BuildType.GetConstructor(new Type[] {typeof (XElement)});
+                    if (ci == null)
+                    {
+                        Debug.Print("Failed to construct instance of " + BuildType.FullName + " As a constructor accepting an argument of type XElement was not found.");
+                        return default(T);
+                    }
                     return (T) ci.Invoke(new object[] {xdata});
                 };
             }
@@ -304,8 +464,29 @@ namespace BASeCamp.XMLSerialization
                 var retrievehelper = GetHelper<T>();
                 if (retrievehelper == null)
                 {
-                    throw new ArgumentException
-                        ("Provided type " + typeof (T).Name + " Does not implement IXMLSerializable and does not have a IXMLProvider implementation available.");
+                    MethodInfo GenHelperMethod = typeof(StandardHelper).GetMethod("GetHelper");
+                    //no dice? Alright, now we need to try to retrieve any helper for the interfaces implemented by that type.
+                    foreach (var loopinterface in typeof(T).GetInterfaces())
+                    {
+                        MethodInfo CallableGetHelper = GenHelperMethod.MakeGenericMethod(new Type[] { loopinterface });
+                        var result = CallableGetHelper.Invoke(null, new object[] { });
+                        if (result != null)
+                        {
+                            Type GenericProviderType = typeof(IXmlPersistableProvider<>);
+                            //we have the type, create the generic type definition...
+                            Type ProviderType = GenericProviderType.MakeGenericType(loopinterface);
+                            //now we want to call SerializeObject on the result, which will be this type.
+                            MethodInfo DeSerializeObjectMethod = ProviderType.GetMethod("DeSerializeObject");
+                            constructitem = (xdata) =>
+                                {
+                                    Object Deserializationresult = DeSerializeObjectMethod.Invoke(result, new object[] { xdata });
+                              
+                                        return (T)Deserializationresult;
+                                    
+                                };
+                        }
+
+                    }
                 }
                 else
                 {
@@ -314,7 +495,56 @@ namespace BASeCamp.XMLSerialization
             }
             return constructitem(XMLSource);
         }
+        public static XElement SaveList(String pNodeName, IList sourceData)
+        {
+            XElement BuildNode = new XElement(pNodeName);
+            try
+            {
+                foreach(Object Item in sourceData)
+                {
+                    Type ElementType = Item.GetType();
+                    //<ListItem Type="TypeName"><SaveElementResult /></ListItem>
+                    String ElementTypeName = ElementType.FullName;
+                    MethodInfo SaveElementMethod = typeof(StandardHelper).GetMethod("SaveElement");
+                    MethodInfo BuildGenElementMethod = SaveElementMethod.MakeGenericMethod(ElementType);
+                    XElement ItemNode = new XElement("ListItem", new XAttribute("Type", ElementTypeName), (XElement)BuildGenElementMethod.Invoke(null, new object[] { Item, "Value" }));
+                    BuildNode.Add(ItemNode);
+                }
+            }
+            catch (Exception exx)
+            {
+                return new XElement(pNodeName);
+            }
+            return BuildNode;
+        }
+        public static IList ReadList(XElement Source)
+        {
+            IList BuildList = new ArrayList();
+            MethodInfo ReadElementGen = typeof(StandardHelper).GetMethod("ReadElement", new Type[] { typeof(XElement)});
+            foreach(var NodeElement in Source.Descendants("ListItem"))
+            {
+                XElement ValueNode = NodeElement.Descendants().FirstOrDefault();
+                String TypeName = NodeElement.GetAttributeString("Type");
+                Type ElementType = Type.GetType(TypeName);
+                MethodInfo ReadElementMethod = ReadElementGen.MakeGenericMethod(ElementType);
+                Object ReadElement = ReadElementMethod.Invoke(null, new object[]{ValueNode});
+                BuildList.Add(ReadElement);
+            }
+            return BuildList;
+        }
+        public static XElement SaveList<T>(List<T> SourceData, String pNodeName,bool IncludeTypeInfo=false)
+        {
+            //without a Func as in the overload, we'll try to "build" our own function.
+            //the function we build will close over a instance of IXMLSerializationProvider (or the type GetXMLData method if it implements IXMLSerializable).
+            //basically we want to create the function to handle the loading of classes that implement the interface or have a defined provider.
 
+            Func<T, XElement> buildfunc = (elem) =>
+                {
+                    return SaveElement(elem, pNodeName,IncludeTypeInfo);
+                };
+
+            return SaveList<T>(buildfunc, pNodeName, SourceData);
+        }
         /// <summary>
         /// Saves a list to an XElement.
         /// </summary>
@@ -334,11 +564,15 @@ namespace BASeCamp.XMLSerialization
             }
             return ListNode;
         }
-
+        public static List<T> ReadList<T>(XElement Source)
+        {
+            Func<XElement, T> constructitem = (xdata) => ReadElement<T>(xdata);
+            return ReadList<T>(constructitem, Source);
+        }
         public static List<T> ReadList<T>(Func<XElement, T> ListLoader, XElement Source)
         {
             List<T> resultlist = new List<T>();
-            foreach (XElement child in Source.DescendantNodes())
+            foreach (XElement child in Source.Elements())
             {
                 T resultnode = ListLoader(child);
                 resultlist.Add(resultnode);
@@ -405,7 +639,14 @@ namespace BASeCamp.XMLSerialization
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
-
+        Color IXmlPersistableProvider<Color>.DeSerializeObject(XElement xmlData)
+        {
+            int Red = xmlData.GetAttributeInt("Red");
+            int Green = xmlData.GetAttributeInt("Green");
+            int Blue = xmlData.GetAttributeInt("Blue");
+            int Alpha = xmlData.GetAttributeInt("Alpha");
+            return Color.FromArgb(Alpha, Red, Green, Blue);
+        }
         public XElement SerializeObject(Color sourceItem, string pNodeName)
         {
             return new XElement
@@ -471,6 +712,26 @@ namespace BASeCamp.XMLSerialization
                     new XAttribute("GammaCorrection", sourceItem.GammaCorrection),
                     new XAttribute("WrapMode", sourceItem.WrapMode)
                 );
+        }
+
+        public XElement SerializeObject(IDictionary sourceItem, string pNodeName)
+        {
+            return SaveDictionary(sourceItem, pNodeName);
+        }
+
+        public XElement SerializeObject(IList sourceItem, string pNodeName)
+        {
+            return SaveList(pNodeName, sourceItem);
+        }
+
+        IList IXmlPersistableProvider<IList>.DeSerializeObject(XElement xmlData)
+        {
+            return ReadList(xmlData);
+        }
+
+        IDictionary IXmlPersistableProvider<IDictionary>.DeSerializeObject(XElement xmlData)
+        {
+            return ReadDictionary(xmlData);
         }
 
         LinearGradientBrush IXmlPersistableProvider<LinearGradientBrush>.DeSerializeObject(XElement xmlData)
@@ -628,12 +889,12 @@ namespace BASeCamp.XMLSerialization
 
         int IXmlPersistableProvider<int>.DeSerializeObject(XElement xmlData)
         {
-            throw new NotImplementedException();
+            return int.Parse(xmlData.Attribute("Value").Value);
         }
 
         short IXmlPersistableProvider<short>.DeSerializeObject(XElement xmlData)
         {
-            throw new NotImplementedException();
+            return short.Parse(xmlData.Attribute("Value").Value);
         }
 
         PointF IXmlPersistableProvider<PointF>.DeSerializeObject(XElement xmlData)
@@ -838,7 +1099,12 @@ namespace BASeCamp.XMLSerialization
 
         public static bool GetAttributeBool(this XElement src, String pName, bool pDefault = false)
         {
-            return GetAttributeInt(src, pName, pDefault ? 1 : 0) == 1;
+            bool parsed;
+            String strbool = GetAttributeString(src, pName, "");
+            if (bool.TryParse(strbool, out parsed))
+                return parsed;
+            else
+                return GetAttributeInt(src, pName, pDefault ? 1 : 0) == 1;
         }
 
         public static Object ReadElement(this XElement src, Type ReadType, String pElementName, Object Default = null)
@@ -865,6 +1131,12 @@ namespace BASeCamp.XMLSerialization
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
             return StandardHelper.ReadList<T>(NodeCheck);
+        }
+        public static Dictionary<K,V> ReadDictionary<K,V>(this XElement src, String pElementName,Dictionary<K,V> Default = null)
+        {
+            XElement NodeCheck = src.Element(pElementName);
+            if (NodeCheck == null) return Default;
+            return StandardHelper.ReadDictionary<K, V>(NodeCheck);
         }
     }
 }

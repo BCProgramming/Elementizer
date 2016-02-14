@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace XMLSerialization
+namespace BASeCamp.Elementizer
 {
     public static class EnumExtensions
     {
@@ -44,6 +44,7 @@ namespace XMLSerialization
         }
         public static T FromFlagString<T>(String source) where T:struct,IConvertible
         {
+            if (String.IsNullOrEmpty(source)) return (T)Enum.GetValues(typeof(T)).GetValue(0);
             if(!typeof(T).IsEnum) throw new ArgumentException("T must be an Enum");
             String[] splitflags = source.Split(',');
             var Enumvalues = (from p in splitflags select (T)Enum.Parse(typeof(T), p));
