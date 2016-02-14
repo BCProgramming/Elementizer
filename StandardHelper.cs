@@ -132,7 +132,7 @@ namespace BASeCamp.Elementizer
             System.Array BuildArray = Array.CreateInstance(typeof (T), DimensionSizes);
             //now we interate through all descendants of the "Dimensions" node.
             int[] elementindex = new int[DimensionSizes.Length];
-            foreach (XElement ReadElement in DimensionElement.Descendants("Element"))
+            foreach (XElement ReadElement in DimensionElement.Elements("Element"))
             {
                 String IndexStr = ReadElement.GetAttributeString("Index");
                 String[] IndexStrings = IndexStr.Split(',');
@@ -143,7 +143,7 @@ namespace BASeCamp.Elementizer
                 }
 
                 //alright- first, read in this element.
-                T readresult = StandardHelper.ReadElement<T>(ReadElement.Descendants().First());
+                T readresult = StandardHelper.ReadElement<T>(ReadElement.Elements().First());
                 //once read, assign it to the appropriate array index.
                 BuildArray.SetValue((object) readresult, elementindex);
             }
@@ -185,10 +185,10 @@ namespace BASeCamp.Elementizer
             Type KeyType = null;
             Type ValueType = null;
             IDictionary ResultDictionary = null;
-            foreach(var DictionaryItem in SourceNode.Descendants("DictionaryItem"))
+            foreach(var DictionaryItem in SourceNode.Elements("DictionaryItem"))
             {
-                XElement KeyNode = DictionaryItem.Descendants("Key").FirstOrDefault();
-                XElement ValueNode = DictionaryItem.Descendants("Value").FirstOrDefault();
+                XElement KeyNode = DictionaryItem.Elements("Key").FirstOrDefault();
+                XElement ValueNode = DictionaryItem.Elements("Value").FirstOrDefault();
                 //each one should have a "Type" attribute.
                 if(KeyType==null)
                 {
@@ -241,11 +241,11 @@ namespace BASeCamp.Elementizer
         {
             Dictionary<TKey, TValue> BuildResult = new Dictionary<TKey, TValue>();
 
-            foreach(var subnode in Source.Descendants("DictionaryItem"))
+            foreach(var subnode in Source.Elements("DictionaryItem"))
             {
                 //each DictionaryItem node has a "Key" node and a "Value" node.
-                XElement KeyNode = subnode.Descendants("Key").FirstOrDefault();
-                XElement ValueNode = subnode.Descendants("Value").FirstOrDefault();
+                XElement KeyNode = subnode.Elements("Key").FirstOrDefault();
+                XElement ValueNode = subnode.Elements("Value").FirstOrDefault();
                 //note: added logic. we need to manually check the KeyNode and ValueNode ourselves, and see if it has a TypeName Attribute.
                 //if it does, we need to call with that type, rather than typeof(TKey).
                 Object KeyValue = ReadElement(typeof(TKey), KeyNode);
@@ -458,9 +458,31 @@ namespace BASeCamp.Elementizer
                     return (T) ci.Invoke(new object[] {xdata});
                 };
             }
+            else if(typeof(T).IsArray)
+            {
+                Type TargetType = typeof(T).GetElementType();
+                
+                //if so, we'll use ReadArray.
+                //In order to do so, we have to construct a Generic Method Call to ReadArray<T>.
+                MethodInfo RaMethod = typeof(StandardHelper).GetMethod("ReadArray");
+                MethodInfo CallRa = RaMethod.MakeGenericMethod(TargetType);
+                //we now call CallRa, which returns an Array...
+
+                Array result = (Array)CallRa.Invoke(StandardHelper.Static, new object[]{XMLSource});
+                return (T)(Object)result;
+                //ReadArray<T>(Source);
+                
+                Debug.Print("Array");
+
+            }
             else
             {
+                //otherwise, is it an array?
+
                 //otherwise, let's see if there is an XMLProvider we can use.
+                
+
+
                 var retrievehelper = GetHelper<T>();
                 if (retrievehelper == null)
                 {
@@ -521,9 +543,9 @@ namespace BASeCamp.Elementizer
         {
             IList BuildList = new ArrayList();
             MethodInfo ReadElementGen = typeof(StandardHelper).GetMethod("ReadElement", new Type[] { typeof(XElement)});
-            foreach(var NodeElement in Source.Descendants("ListItem"))
+            foreach(var NodeElement in Source.Elements("ListItem"))
             {
-                XElement ValueNode = NodeElement.Descendants().FirstOrDefault();
+                XElement ValueNode = NodeElement.Elements().FirstOrDefault();
                 String TypeName = NodeElement.GetAttributeString("Type");
                 Type ElementType = Type.GetType(TypeName);
                 MethodInfo ReadElementMethod = ReadElementGen.MakeGenericMethod(ElementType);
