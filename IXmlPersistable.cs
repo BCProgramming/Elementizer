@@ -7,6 +7,7 @@ using System.Xml.Linq;
 
 namespace BASeCamp.Elementizer
 {
+    
     /// <summary>
     /// Indicates a object supports our XElement Serialization, serializing to an XElement.
     /// This also means the class must implement a constructor which accepts a single XElement parameter
@@ -18,7 +19,7 @@ namespace BASeCamp.Elementizer
         /// Retrieves the XElement representation of this class instance.
         /// </summary>
         /// <returns>XElement representing this class which can be used to reconstitute it by passing it via the constructor.</returns>
-        XElement GetXmlData(String pNodeName);
+        XElement GetXmlData(String pNodeName,Object PersistenceData);
 
     }
     /// <summary>
@@ -33,20 +34,20 @@ namespace BASeCamp.Elementizer
         /// <param name="sourceItem">Source Item to serialize to an XML Element.</param>
         /// <param name="pNodeName">Name to give the resulting XML Node.</param>
         /// <returns>XElement representing the given instance.</returns>
-        XElement SerializeObject(T sourceItem,String pNodeName);
+        XElement SerializeObject(T sourceItem,String pNodeName,Object pPersistenceData);
         /// <summary>
         /// constructs a T out of the given XElement data.
         /// </summary>
         /// <param name="xmlData"></param>
         /// <returns>reconstuted type T from the given XElement.</returns>
-        T DeSerializeObject(XElement xmlData);
+        T DeSerializeObject(XElement xmlData,Object pPersistenceData);
 
     }
     public static class SerializationProviderExtensions
     {
-        public static XElement SerializeObject<T>(this IXmlPersistableProvider<T> source,String pNodeName,T SourceItem)
+        public static XElement SerializeObject<T>(this IXmlPersistableProvider<T> source,String pNodeName,T SourceItem,Object pPersistenceData)
         {
-            return source.SerializeObject(SourceItem, pNodeName);
+            return source.SerializeObject(SourceItem, pNodeName,pPersistenceData);
         }
     }
 }

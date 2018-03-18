@@ -134,7 +134,7 @@ namespace BASeCamp.Elementizer
         /// <typeparam name="T">Type of Elements of the Array.</typeparam>
         /// <param name="SourceElement">XElement from which to read Array Data.</param>
         /// <returns>A System.Array populated from the contents of the given XElement.</returns>
-        public static System.Array ReadArray<T>(XElement SourceElement)
+        public static System.Array ReadArray<T>(XElement SourceElement,Object pPersistenceData)
         {
             //read the "rank" attribute.
             if (SourceElement.Attribute("Rank") == null) return Array.CreateInstance(typeof(T), 0);
@@ -173,7 +173,7 @@ namespace BASeCamp.Elementizer
                 }
 
                 //alright- first, read in this element.
-                T readresult = StandardHelper.ReadElement<T>(ReadElement.Elements().First());
+                T readresult = StandardHelper.ReadElement<T>(ReadElement.Elements().First(),pPersistenceData);
                 //once read, assign it to the appropriate array index.
                 BuildArray.SetValue((object) readresult, elementindex);
             }
@@ -210,7 +210,7 @@ namespace BASeCamp.Elementizer
             }
             return BuildResult;
         }
-        public static IDictionary ReadDictionary(XElement SourceNode)
+        public static IDictionary ReadDictionary(XElement SourceNode,Object pPersistenceData)
         {
             Type KeyType = null;
             Type ValueType = null;
@@ -234,14 +234,14 @@ namespace BASeCamp.Elementizer
                     
 
                 }
-                Object KeyValue = ReadElement(KeyType, KeyNode);
-                Object ValueValue = ReadElement(ValueType, ValueNode);
+                Object KeyValue = ReadElement(KeyType, KeyNode,pPersistenceData);
+                Object ValueValue = ReadElement(ValueType, ValueNode,pPersistenceData);
                 ResultDictionary.Add(KeyValue,ValueValue);
 
             }
             return ResultDictionary;
         }
-        public static XElement SaveDictionary<TKey,TValue>(Dictionary<TKey,TValue> Source,String pNodeName)
+        public static XElement SaveDictionary<TKey,TValue>(Dictionary<TKey,TValue> Source,String pNodeName,Object pPersistenceData)
         {
             //format is a list of subnodes- "<DictionaryItem><Key /><Value /></DictionaryItem>
             if(Source==null) throw new ArgumentNullException("Source");
@@ -252,8 +252,8 @@ namespace BASeCamp.Elementizer
                 Type StoredKeyType = null;
                 Type StoredValueType = null;
                 TKey keyval = kvp.Key;
-                XElement SavedKey = SaveElementTypeReturn(keyval, "Key",out StoredKeyType);
-                XElement SavedValue = SaveElementTypeReturn(kvp.Value, "Value",out StoredValueType);
+                XElement SavedKey = SaveElementTypeReturn(keyval, "Key",pPersistenceData,out StoredKeyType);
+                XElement SavedValue = SaveElementTypeReturn(kvp.Value, "Value",pPersistenceData,out StoredValueType);
                 if(!(keyval.GetType() == StoredKeyType))
                 {
                     //if different, store in the Element.
@@ -267,7 +267,7 @@ namespace BASeCamp.Elementizer
             }
             return BuildResult;
         }
-        public static Dictionary<TKey,TValue> ReadDictionary<TKey,TValue>(XElement Source)
+        public static Dictionary<TKey,TValue> ReadDictionary<TKey,TValue>(XElement Source,Object pPersistenceData)
         {
             Dictionary<TKey, TValue> BuildResult = new Dictionary<TKey, TValue>();
 
@@ -278,8 +278,8 @@ namespace BASeCamp.Elementizer
                 XElement ValueNode = subnode.Elements("Value").FirstOrDefault();
                 //note: added logic. we need to manually check the KeyNode and ValueNode ourselves, and see if it has a TypeName Attribute.
                 //if it does, we need to call with that type, rather than typeof(TKey).
-                Object KeyValue = ReadElement(typeof(TKey), KeyNode);
-                Object ValueValue = ReadElement(typeof(TValue), ValueNode);
+                Object KeyValue = ReadElement(typeof(TKey), KeyNode,pPersistenceData);
+                Object ValueValue = ReadElement(typeof(TValue), ValueNode,pPersistenceData);
                 BuildResult.Add((TKey)KeyValue, (TValue)ValueValue);
             }
 
@@ -296,7 +296,7 @@ namespace BASeCamp.Elementizer
         /// <param name="pNodeName">Node name to use.</param>
         /// <exception cref="ArgumentNullException">If either input parameter is null.</exception>
         /// <returns></returns>
-        public static XElement SaveArray(System.Array pArrayData, String pNodeName)
+        public static XElement SaveArray(System.Array pArrayData, String pNodeName,Object pPersistData)
         {
             
             if (pNodeName == null) throw new ArgumentNullException("pNodeName");
@@ -328,7 +328,7 @@ namespace BASeCamp.Elementizer
                 //for the Generic Method using the Type of the System.Array Element Type we were passed.
                 MethodInfo GenericCall = typeof (StandardHelper).GetMethod("SaveElement").MakeGenericMethod(pArrayData.GetType().GetElementType());
 
-                XElement ElementBuilt = (XElement) GenericCall.Invoke(null, new object[] {pArrayData.GetValue(indices), (Object) "Data",false});
+                XElement ElementBuilt = (XElement) GenericCall.Invoke(null, new object[] {pArrayData.GetValue(indices), (Object) "Data", pPersistData,false });
                 //add the element, tagged with the Indices.
                 DimensionElement.Add(new XElement("Element", new XAttribute("Index", String.Join(",", from p in indices select p.ToString())), ElementBuilt));
 
@@ -376,21 +376,21 @@ namespace BASeCamp.Elementizer
         }
 
 
-        public static XElement SaveElement<T>(T SourceData, String pNodeName,bool IncludeTypeInfo=false)
+        public static XElement SaveElement<T>(T SourceData, String pNodeName,Object pPersistData,bool IncludeTypeInfo=false)
         {
             Type storedType = null;
-            XElement elementresult = SaveElementTypeReturn<T>(SourceData, pNodeName, out storedType);
+            XElement elementresult = SaveElementTypeReturn<T>(SourceData, pNodeName,pPersistData, out storedType);
             if(IncludeTypeInfo)
                 elementresult.Add(new XAttribute("Type",SourceData.GetType().Name));
 
             return elementresult;
         }
-        public static XElement SaveElementTypeReturn<T>(T SourceData, String pNodeName,out Type pStoredType)
+        public static XElement SaveElementTypeReturn<T>(T SourceData, String pNodeName,Object pPersistData,out Type pStoredType)
         {
             pStoredType = typeof(T);
             if (typeof (T).IsArray)
             {
-                return SaveArray((System.Array) (Object) SourceData, pNodeName);
+                return SaveArray((System.Array) (Object) SourceData, pNodeName,pPersistData);
             }
             
             
@@ -406,7 +406,7 @@ namespace BASeCamp.Elementizer
             if (implementsInterface)
             {
                 //if it implements the interface, we'll use the GetXMLData.
-                buildfunc = (elem) => ((IXmlPersistable) elem).GetXmlData(pNodeName);
+                buildfunc = (elem) => ((IXmlPersistable) elem).GetXmlData(pNodeName,null);
             }
             else
             {
@@ -431,7 +431,7 @@ namespace BASeCamp.Elementizer
                             MethodInfo SerializeObjectMethod = ProviderType.GetMethod("SerializeObject");
                             buildfunc = (elem) =>
                             {
-                                return (XElement)(SerializeObjectMethod.Invoke(result, new object[] { elem, pNodeName }));
+                                return (XElement)(SerializeObjectMethod.Invoke(result, new object[] { elem, pNodeName,null }));
                             };
                             break;
                         }
@@ -440,7 +440,7 @@ namespace BASeCamp.Elementizer
                 }
                 else
                 {
-                    buildfunc = (elem) => retrievehelper.SerializeObject(elem, pNodeName);
+                    buildfunc = (elem) => retrievehelper.SerializeObject(elem, pNodeName,null);
                 }
             }
             if (buildfunc == null)
@@ -450,15 +450,15 @@ namespace BASeCamp.Elementizer
             return buildfunc(SourceData);
         }
 
-        public static Object ReadElement(Type sTargetType, XElement Source)
+        public static Object ReadElement(Type sTargetType, XElement Source,Object pPersistenceData)
         {
-            var elementmethod = typeof (StandardHelper).GetMethod("ReadElement", new Type[] {typeof (XElement)});
+            var elementmethod = typeof (StandardHelper).GetMethod("ReadElement", new Type[] {typeof (XElement),typeof(Object)});
             var buildcall = elementmethod.MakeGenericMethod(new Type[] {sTargetType});
-            Object callresult = buildcall.Invoke(null, new object[] {Source});
+            Object callresult = buildcall.Invoke(null, new object[] {Source,pPersistenceData});
             return callresult;
         }
 
-        public static T ReadElement<T>(XElement XMLSource)
+        public static T ReadElement<T>(XElement XMLSource, Object pPersistenceData)
         {
             Func<XElement, T> constructitem = null;
             bool implementsInterface = false;
@@ -479,13 +479,13 @@ namespace BASeCamp.Elementizer
                     {
                         BuildType = ClassFinder(XMLSource.Attribute("Type").Value);
                     }
-                    ConstructorInfo ci = BuildType.GetConstructor(new Type[] {typeof (XElement)});
+                    ConstructorInfo ci = BuildType.GetConstructor(new Type[] {typeof (XElement),typeof(Object)});
                     if (ci == null)
                     {
                         Debug.Print("Failed to construct instance of " + BuildType.FullName + " As a constructor accepting an argument of type XElement was not found.");
                         return default(T);
                     }
-                    return (T) ci.Invoke(new object[] {xdata});
+                    return (T) ci.Invoke(new object[] {xdata,pPersistenceData});
                 };
             }
             else if(typeof(T).IsArray)
@@ -497,8 +497,8 @@ namespace BASeCamp.Elementizer
                 MethodInfo RaMethod = typeof(StandardHelper).GetMethod("ReadArray");
                 MethodInfo CallRa = RaMethod.MakeGenericMethod(TargetType);
                 //we now call CallRa, which returns an Array...
-
-                Array result = (Array)CallRa.Invoke(StandardHelper.Static, new object[]{XMLSource});
+                
+                Array result = (Array)CallRa.Invoke(StandardHelper.Static, new object[]{XMLSource,pPersistenceData});
                 return (T)(Object)result;
                 //ReadArray<T>(Source);
                 
@@ -531,18 +531,16 @@ namespace BASeCamp.Elementizer
                             MethodInfo DeSerializeObjectMethod = ProviderType.GetMethod("DeSerializeObject");
                             constructitem = (xdata) =>
                                 {
-                                    Object Deserializationresult = DeSerializeObjectMethod.Invoke(result, new object[] { xdata });
-                              
-                                        return (T)Deserializationresult;
-                                    
+                                    Object Deserializationresult = DeSerializeObjectMethod.Invoke(result, new object[] { xdata, pPersistenceData });
+
+                                    return (T)Deserializationresult;
                                 };
                         }
-
                     }
                 }
                 else
                 {
-                    constructitem = (xdata) => retrievehelper.DeSerializeObject(xdata);
+                    constructitem = (xdata) => retrievehelper.DeSerializeObject(xdata,null);
                 }
             }
             return constructitem(XMLSource);
@@ -569,33 +567,33 @@ namespace BASeCamp.Elementizer
             }
             return BuildNode;
         }
-        public static IList ReadList(XElement Source)
+        public static IList ReadList(XElement Source,Object pPersistenceData)
         {
             IList BuildList = new ArrayList();
-            MethodInfo ReadElementGen = typeof(StandardHelper).GetMethod("ReadElement", new Type[] { typeof(XElement)});
+            MethodInfo ReadElementGen = typeof(StandardHelper).GetMethod("ReadElement", new Type[] { typeof(XElement),typeof(Object)});
             foreach(var NodeElement in Source.Elements("ListItem"))
             {
                 XElement ValueNode = NodeElement.Elements().FirstOrDefault();
                 String TypeName = NodeElement.GetAttributeString("Type");
                 Type ElementType = Type.GetType(TypeName);
                 MethodInfo ReadElementMethod = ReadElementGen.MakeGenericMethod(ElementType);
-                Object ReadElement = ReadElementMethod.Invoke(null, new object[]{ValueNode});
+                Object ReadElement = ReadElementMethod.Invoke(null, new object[]{ValueNode,pPersistenceData});
                 BuildList.Add(ReadElement);
             }
             return BuildList;
         }
-        public static XElement SaveList<T>(List<T> SourceData, String pNodeName,bool IncludeTypeInfo=false)
+        public static XElement SaveList<T>(List<T> SourceData, String pNodeName,Object pPersistenceData,bool IncludeTypeInfo=false)
         {
             //without a Func as in the overload, we'll try to "build" our own function.
             //the function we build will close over a instance of IXMLSerializationProvider (or the type GetXMLData method if it implements IXMLSerializable).
             //basically we want to create the function to handle the loading of classes that implement the interface or have a defined provider.
 
-            Func<T, XElement> buildfunc = (elem) =>
+            Func<T, Object,XElement> buildfunc = (elem,Persistdata) =>
                 {
-                    return SaveElement(elem, pNodeName,IncludeTypeInfo);
+                    return SaveElement(elem, pNodeName,Persistdata,IncludeTypeInfo);
                 };
 
-            return SaveList<T>(buildfunc, pNodeName, SourceData);
+            return SaveList<T>(buildfunc, pNodeName, SourceData,pPersistenceData);
         }
         /// <summary>
         /// Saves a list to an XElement.
@@ -604,29 +602,29 @@ namespace BASeCamp.Elementizer
         /// <param name="SourceTransform">Function that takes the Type T item and saves it to an XElement.</param>
         /// <param name="SourceData">Source List data.</param>
         /// <returns></returns>
-        public static XElement SaveList<T>(Func<T, XElement> SourceTransform, String pNodeName, List<T> SourceData)
+        public static XElement SaveList<T>(Func<T,Object, XElement> SourceTransform, String pNodeName, List<T> SourceData,Object pPersistenceData)
         {
             XElement ListNode = new XElement
                 (pNodeName,
                     new XAttribute("ListType", typeof (T).Name));
             foreach (T iterateNode in SourceData)
             {
-                XElement addContent = SourceTransform(iterateNode);
+                XElement addContent = SourceTransform(iterateNode,pPersistenceData);
                 ListNode.Add(addContent);
             }
             return ListNode;
         }
-        public static List<T> ReadList<T>(XElement Source)
+        public static List<T> ReadList<T>(XElement Source, Object pPersistenceData)
         {
-            Func<XElement, T> constructitem = (xdata) => ReadElement<T>(xdata);
-            return ReadList<T>(constructitem, Source);
+            Func<XElement,Object, T> constructitem = (xdata,persist) => ReadElement<T>(xdata,persist);
+            return ReadList<T>(constructitem, Source,pPersistenceData);
         }
-        public static List<T> ReadList<T>(Func<XElement, T> ListLoader, XElement Source)
+        public static List<T> ReadList<T>(Func<XElement,Object, T> ListLoader, XElement Source,Object pPersistenceData)
         {
             List<T> resultlist = new List<T>();
             foreach (XElement child in Source.Elements())
             {
-                T resultnode = ListLoader(child);
+                T resultnode = ListLoader(child,pPersistenceData);
                 resultlist.Add(resultnode);
             }
             return resultlist;
@@ -636,13 +634,13 @@ namespace BASeCamp.Elementizer
 
         #region Point Serialization
 
-        XElement IXmlPersistableProvider<Point>.SerializeObject(Point sourceItem, String pNodeName)
+        XElement IXmlPersistableProvider<Point>.SerializeObject(Point sourceItem, String pNodeName, Object pPersistenceData)
         {
             if (pNodeName == null) pNodeName = "Point";
             return new XElement(pNodeName, new XAttribute("X", sourceItem.X), new XAttribute("Y", sourceItem.Y));
         }
 
-        XElement IXmlPersistableProvider<PointF>.SerializeObject(PointF sourceItem, String pNodeName)
+        XElement IXmlPersistableProvider<PointF>.SerializeObject(PointF sourceItem, String pNodeName, Object pPersistenceData)
         {
             if (pNodeName == null) pNodeName = "PointF";
             return new XElement(pNodeName, new XAttribute("X", sourceItem.X), new XAttribute("Y", sourceItem.Y));
@@ -652,46 +650,46 @@ namespace BASeCamp.Elementizer
 
         #region PointF Serialization
 
-        XElement IXmlPersistableProvider<short>.SerializeObject(short sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<short>.SerializeObject(short sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<int>.SerializeObject(int sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<int>.SerializeObject(int sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<long>.SerializeObject(long sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<long>.SerializeObject(long sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<string>.SerializeObject(string sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<string>.SerializeObject(string sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<float>.SerializeObject(float sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<float>.SerializeObject(float sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<double>.SerializeObject(double sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<double>.SerializeObject(double sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<decimal>.SerializeObject(decimal sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<decimal>.SerializeObject(decimal sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
 
-        XElement IXmlPersistableProvider<bool>.SerializeObject(bool sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<bool>.SerializeObject(bool sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement(pNodeName, new XAttribute("Value", sourceItem));
         }
-        Color IXmlPersistableProvider<Color>.DeSerializeObject(XElement xmlData)
+        Color IXmlPersistableProvider<Color>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             int Red = xmlData.GetAttributeInt("Red");
             int Green = xmlData.GetAttributeInt("Green");
@@ -699,7 +697,7 @@ namespace BASeCamp.Elementizer
             int Alpha = xmlData.GetAttributeInt("Alpha");
             return Color.FromArgb(Alpha, Red, Green, Blue);
         }
-        public XElement SerializeObject(Color sourceItem, string pNodeName)
+        public XElement SerializeObject(Color sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement
                 (pNodeName,
@@ -710,7 +708,7 @@ namespace BASeCamp.Elementizer
                 );
         }
 
-        public XElement SerializeObject(Font sourceItem, string pNodeName)
+        public XElement SerializeObject(Font sourceItem, string pNodeName, Object pPersistenceData)
         {
             XElement result = new XElement
                 (pNodeName,
@@ -720,7 +718,7 @@ namespace BASeCamp.Elementizer
             return result;
         }
 
-        public XElement SerializeObject(ColorMatrix sourceItem, string pNodeName)
+        public XElement SerializeObject(ColorMatrix sourceItem, string pNodeName, Object pPersistenceData)
         {
             float[][] matrixvalues =
             {
@@ -737,56 +735,56 @@ namespace BASeCamp.Elementizer
                     matrixvalues[x][y] = sourceItem[x, y];
                 }
             }
-            return SaveArray(matrixvalues, pNodeName);
+            return SaveArray(matrixvalues, pNodeName,null);
         }
 
 
-        public XElement SerializeObject(Pen sourceItem, string pNodeName)
+        public XElement SerializeObject(Pen sourceItem, string pNodeName, Object pPersistenceData)
         {
             throw new NotImplementedException();
         }
 
-        public XElement SerializeObject(SolidBrush sourceItem, string pNodeName)
+        public XElement SerializeObject(SolidBrush sourceItem, string pNodeName, Object pPersistenceData)
         {
-            return new XElement(pNodeName, StandardHelper.SaveElement(sourceItem.Color, "Color"));
+            return new XElement(pNodeName, StandardHelper.SaveElement(sourceItem.Color, "Color",null));
         }
 
 
-        public XElement SerializeObject(LinearGradientBrush sourceItem, string pNodeName)
+        public XElement SerializeObject(LinearGradientBrush sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement
                 (pNodeName,
-                    SaveElement(sourceItem.InterpolationColors, "InterpolationColors"),
-                    SaveElement(sourceItem.LinearColors, "LinearColors"),
-                    SaveElement(sourceItem.Rectangle, "Rectangle"),
-                    SaveElement(sourceItem.Transform, "Transform"),
-                    SaveElement(sourceItem.Blend, "Blend"),
+                    SaveElement(sourceItem.InterpolationColors, "InterpolationColors",null),
+                    SaveElement(sourceItem.LinearColors, "LinearColors",null),
+                    SaveElement(sourceItem.Rectangle, "Rectangle",null),
+                    SaveElement(sourceItem.Transform, "Transform",null),
+                    SaveElement(sourceItem.Blend, "Blend",null),
                     new XAttribute("GammaCorrection", sourceItem.GammaCorrection),
                     new XAttribute("WrapMode", sourceItem.WrapMode)
                 );
         }
 
-        public XElement SerializeObject(IDictionary sourceItem, string pNodeName)
+        public XElement SerializeObject(IDictionary sourceItem, string pNodeName, Object pPersistenceData)
         {
             return SaveDictionary(sourceItem, pNodeName);
         }
 
-        public XElement SerializeObject(IList sourceItem, string pNodeName)
+        public XElement SerializeObject(IList sourceItem, string pNodeName, Object pPersistenceData)
         {
             return SaveList(pNodeName, sourceItem);
         }
 
-        IList IXmlPersistableProvider<IList>.DeSerializeObject(XElement xmlData)
+        IList IXmlPersistableProvider<IList>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
-            return ReadList(xmlData);
+            return ReadList(xmlData,pPersistenceData);
         }
 
-        IDictionary IXmlPersistableProvider<IDictionary>.DeSerializeObject(XElement xmlData)
+        IDictionary IXmlPersistableProvider<IDictionary>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
-            return ReadDictionary(xmlData);
+            return ReadDictionary(xmlData,pPersistenceData);
         }
 
-        LinearGradientBrush IXmlPersistableProvider<LinearGradientBrush>.DeSerializeObject(XElement xmlData)
+        LinearGradientBrush IXmlPersistableProvider<LinearGradientBrush>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             ColorBlend interpolationcolors = xmlData.ReadElement<ColorBlend>("InterpolationColors");
             Color[] linearcolors = xmlData.ReadElement<Color[]>("LinearColors");
@@ -806,12 +804,12 @@ namespace BASeCamp.Elementizer
             };
         }
 
-        public XElement SerializeObject(ColorBlend sourceItem, string pNodeName)
+        public XElement SerializeObject(ColorBlend sourceItem, string pNodeName, Object pPersistenceData)
         {
-            return new XElement(pNodeName, SaveElement(sourceItem.Colors, "Colors"), SaveElement(sourceItem.Positions, "Positions"));
+            return new XElement(pNodeName, SaveElement(sourceItem.Colors, "Colors",pPersistenceData), SaveElement(sourceItem.Positions, "Positions",pPersistenceData));
         }
 
-        ColorBlend IXmlPersistableProvider<ColorBlend>.DeSerializeObject(XElement xmlData)
+        ColorBlend IXmlPersistableProvider<ColorBlend>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             Color[] colors = xmlData.ReadElement<Color[]>("Colors", null);
             float[] positions = xmlData.ReadElement<float[]>("Positions", null);
@@ -820,14 +818,14 @@ namespace BASeCamp.Elementizer
         }
 
 
-        XElement IXmlPersistableProvider<Blend>.SerializeObject(Blend sourceItem, string pNodeName)
+        XElement IXmlPersistableProvider<Blend>.SerializeObject(Blend sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement
-                (pNodeName, StandardHelper.SaveElement(sourceItem.Factors, "Factors"),
-                    StandardHelper.SaveElement(sourceItem.Positions, "Positions"));
+                (pNodeName, StandardHelper.SaveElement(sourceItem.Factors, "Factors",pPersistenceData),
+                    StandardHelper.SaveElement(sourceItem.Positions, "Positions",pPersistenceData));
         }
 
-        Blend IXmlPersistableProvider<Blend>.DeSerializeObject(XElement xmlData)
+        Blend IXmlPersistableProvider<Blend>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             float[] Factors = xmlData.ReadElement<float[]>("Factors", null);
             float[] Positions = xmlData.ReadElement<float[]>("Positions", null);
@@ -838,22 +836,22 @@ namespace BASeCamp.Elementizer
         }
 
 
-        public XElement SerializeObject(Matrix sourceItem, string pNodeName)
+        public XElement SerializeObject(Matrix sourceItem, string pNodeName, Object pPersistenceData)
         {
             return new XElement
                 (pNodeName,
-                    StandardHelper.SaveArray(sourceItem.Elements, "Elements"));
+                    StandardHelper.SaveArray(sourceItem.Elements, "Elements",pPersistenceData));
         }
 
-        Matrix IXmlPersistableProvider<Matrix>.DeSerializeObject(XElement xmlData)
+        Matrix IXmlPersistableProvider<Matrix>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
-            float[] elementread = (float[]) StandardHelper.ReadArray<float>(xmlData.Element("Elements"));
+            float[] elementread = (float[]) StandardHelper.ReadArray<float>(xmlData.Element("Elements"),pPersistenceData);
             Matrix m = new Matrix(elementread[0], elementread[1], elementread[2], elementread[3], elementread[4], elementread[5]);
             return m;
         }
 
 
-        TextureBrush IXmlPersistableProvider<TextureBrush>.DeSerializeObject(XElement xmlData)
+        TextureBrush IXmlPersistableProvider<TextureBrush>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             Image buildimage = xmlData.ReadElement<Image>("TextureImage", null);
             Matrix transformmatrix = xmlData.ReadElement<Matrix>("Transform", null);
@@ -864,33 +862,33 @@ namespace BASeCamp.Elementizer
             return buildbrush;
         }
 
-        public XElement SerializeObject(TextureBrush sourceItem, string pNodeName)
+        public XElement SerializeObject(TextureBrush sourceItem, string pNodeName, Object pPersistenceData)
         {
             XElement result = new XElement
                 (pNodeName,
-                    StandardHelper.SaveElement(sourceItem.Image, "TextureImage"),
-                    StandardHelper.SaveElement(sourceItem.Transform, "Transform"),
+                    StandardHelper.SaveElement(sourceItem.Image, "TextureImage",pPersistenceData),
+                    StandardHelper.SaveElement(sourceItem.Transform, "Transform",pPersistenceData),
                     new XAttribute("WrapMode", (int) sourceItem.WrapMode));
 
 
             return result;
         }
 
-        SolidBrush IXmlPersistableProvider<SolidBrush>.DeSerializeObject(XElement xmlData)
+        SolidBrush IXmlPersistableProvider<SolidBrush>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             Color useColor = xmlData.ReadElement("Color", Color.Transparent);
             return new SolidBrush(useColor);
         }
 
 
-        ColorMatrix IXmlPersistableProvider<ColorMatrix>.DeSerializeObject(XElement xmlData)
+        ColorMatrix IXmlPersistableProvider<ColorMatrix>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
-            Array result = ReadArray<float[]>(xmlData);
+            Array result = ReadArray<float[]>(xmlData,pPersistenceData);
             float[][] usematrix = (float[][]) result;
             return new ColorMatrix(usematrix);
         }
 
-        Font IXmlPersistableProvider<Font>.DeSerializeObject(XElement xmlData)
+        Font IXmlPersistableProvider<Font>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             String FontFamily = xmlData.GetAttributeString("FontFamily");
             float PointSize = xmlData.GetAttributeFloat("PointSize", 12f);
@@ -909,47 +907,47 @@ namespace BASeCamp.Elementizer
             return Color.FromArgb(Alpha, Red, Green, Blue);
         }
 
-        bool IXmlPersistableProvider<bool>.DeSerializeObject(XElement xmlData)
+        bool IXmlPersistableProvider<bool>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return bool.Parse(xmlData.Attribute("Value").Value);
         }
 
-        decimal IXmlPersistableProvider<decimal>.DeSerializeObject(XElement xmlData)
+        decimal IXmlPersistableProvider<decimal>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return decimal.Parse(xmlData.Attribute("Value").Value);
         }
 
-        double IXmlPersistableProvider<double>.DeSerializeObject(XElement xmlData)
+        double IXmlPersistableProvider<double>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return double.Parse(xmlData.Attribute("Value").Value);
         }
 
-        float IXmlPersistableProvider<float>.DeSerializeObject(XElement xmlData)
+        float IXmlPersistableProvider<float>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return float.Parse(xmlData.Attribute("Value").Value);
         }
 
-        string IXmlPersistableProvider<string>.DeSerializeObject(XElement xmlData)
+        string IXmlPersistableProvider<string>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return xmlData.Attribute("Value").Value;
         }
 
-        long IXmlPersistableProvider<long>.DeSerializeObject(XElement xmlData)
+        long IXmlPersistableProvider<long>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return long.Parse(xmlData.Attribute("Value").Value);
         }
 
-        int IXmlPersistableProvider<int>.DeSerializeObject(XElement xmlData)
+        int IXmlPersistableProvider<int>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return int.Parse(xmlData.Attribute("Value").Value);
         }
 
-        short IXmlPersistableProvider<short>.DeSerializeObject(XElement xmlData)
+        short IXmlPersistableProvider<short>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             return short.Parse(xmlData.Attribute("Value").Value);
         }
 
-        PointF IXmlPersistableProvider<PointF>.DeSerializeObject(XElement xmlData)
+        PointF IXmlPersistableProvider<PointF>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             float X = 0, Y = 0;
             String sX, sY;
@@ -967,7 +965,7 @@ namespace BASeCamp.Elementizer
         }
 
 
-        Point IXmlPersistableProvider<Point>.DeSerializeObject(XElement xmlData)
+        Point IXmlPersistableProvider<Point>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             int X = 0, Y = 0;
             String sX, sY;
@@ -988,7 +986,7 @@ namespace BASeCamp.Elementizer
 
         #region Rectangle Serialization
 
-        XElement IXmlPersistableProvider<Rectangle>.SerializeObject(Rectangle sourceItem, String pNodeName)
+        XElement IXmlPersistableProvider<Rectangle>.SerializeObject(Rectangle sourceItem, String pNodeName, Object pPersistenceData)
         {
             if (pNodeName == null) pNodeName = "Rectangle";
             return new XElement
@@ -997,7 +995,7 @@ namespace BASeCamp.Elementizer
                     new XAttribute("Height", sourceItem.Height));
         }
 
-        Rectangle IXmlPersistableProvider<Rectangle>.DeSerializeObject(XElement xmlData)
+        Rectangle IXmlPersistableProvider<Rectangle>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             int Left = 0, Top = 0, Width = 0, Height = 0;
             String sLeft, sTop, sWidth, sHeight;
@@ -1024,7 +1022,7 @@ namespace BASeCamp.Elementizer
 
         #region RectangleF deserialization
 
-        XElement IXmlPersistableProvider<RectangleF>.SerializeObject(RectangleF sourceItem, String pNodeName)
+        XElement IXmlPersistableProvider<RectangleF>.SerializeObject(RectangleF sourceItem, String pNodeName, Object pPersistenceData)
         {
             if (pNodeName == null) pNodeName = "Rectangle";
             return new XElement
@@ -1033,7 +1031,7 @@ namespace BASeCamp.Elementizer
                     new XAttribute("Height", sourceItem.Height));
         }
 
-        RectangleF IXmlPersistableProvider<RectangleF>.DeSerializeObject(XElement xmlData)
+        RectangleF IXmlPersistableProvider<RectangleF>.DeSerializeObject(XElement xmlData, Object pPersistenceData)
         {
             float Left = 0, Top = 0, Width = 0, Height = 0;
             String sLeft, sTop, sWidth, sHeight;
@@ -1060,7 +1058,7 @@ namespace BASeCamp.Elementizer
 
         #region Image implementation
 
-        XElement IXmlPersistableProvider<Image>.SerializeObject(Image sourceItem, String pNodeName)
+        XElement IXmlPersistableProvider<Image>.SerializeObject(Image sourceItem, String pNodeName, Object pPersistenceData)
         {
             if (pNodeName == null) pNodeName = "Image";
             //an image. we'll do a bit of a cheat here, and base64 encode the image data as the value of the XML tag.
@@ -1076,7 +1074,7 @@ namespace BASeCamp.Elementizer
             return new XElement(pNodeName, sBase64);
         }
 
-        Image IXmlPersistableProvider<Image>.DeSerializeObject(XElement xmlData)
+        Image IXmlPersistableProvider<Image>.DeSerializeObject(XElement xmlData,Object pPersistenceData)
         {
             String sBase64 = xmlData.Value;
             byte[] contents = Convert.FromBase64String(sBase64);
@@ -1159,36 +1157,36 @@ namespace BASeCamp.Elementizer
                 return GetAttributeInt(src, pName, pDefault ? 1 : 0) == 1;
         }
 
-        public static Object ReadElement(this XElement src, Type ReadType, String pElementName, Object Default = null)
+        public static Object ReadElement(this XElement src, Type ReadType, String pElementName, Object Default = null,Object pPersistenceData=null)
         {
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
-            return StandardHelper.ReadElement(ReadType, src);
+            return StandardHelper.ReadElement(ReadType, src,pPersistenceData);
         }
 
-        public static T ReadElement<T>(this XElement src, String pElementName, T Default = default(T))
+        public static T ReadElement<T>(this XElement src, String pElementName, T Default = default(T),Object pPersistenceData=null)
         {
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
-            return StandardHelper.ReadElement<T>(NodeCheck);
+            return StandardHelper.ReadElement<T>(NodeCheck,pPersistenceData);
         }
-        public static System.Array ReadArray<T>(this XElement src,String pElementName,System.Array Default=null)
+        public static System.Array ReadArray<T>(this XElement src,String pElementName,System.Array Default=null,Object pPersistenceData = null)
         {
             XElement NodeCheck = src.Element(pElementName);
             if(NodeCheck==null) return Default;
-            return StandardHelper.ReadArray<T>(NodeCheck);
+            return StandardHelper.ReadArray<T>(NodeCheck,pPersistenceData);
         }
-        public static List<T> ReadList<T>(this XElement src,String pElementName,List<T> Default = null)
+        public static List<T> ReadList<T>(this XElement src,String pElementName,List<T> Default = null,Object pPersistenceData=null)
         {
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
-            return StandardHelper.ReadList<T>(NodeCheck);
+            return StandardHelper.ReadList<T>(NodeCheck,pPersistenceData);
         }
-        public static Dictionary<K,V> ReadDictionary<K,V>(this XElement src, String pElementName,Dictionary<K,V> Default = null)
+        public static Dictionary<K,V> ReadDictionary<K,V>(this XElement src, String pElementName,Dictionary<K,V> Default = null,Object pPersistenceData = null)
         {
             XElement NodeCheck = src.Element(pElementName);
             if (NodeCheck == null) return Default;
-            return StandardHelper.ReadDictionary<K, V>(NodeCheck);
+            return StandardHelper.ReadDictionary<K, V>(NodeCheck,pPersistenceData);
         }
     }
 }
