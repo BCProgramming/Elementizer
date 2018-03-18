@@ -1,4 +1,29 @@
-﻿using System;
+﻿/*Copyright (c) 2015, Michael Burgwin/BASeCamp Corporation
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and 
+ * the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse 
+ * or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR 
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS 
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, 
+OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,6 +41,9 @@ using System.Xml.Linq;
 
 namespace BASeCamp.Elementizer
 {
+    /// <summary>
+    /// public class that primarily contains helper methods and implementations of IXmlPersistableProvider for several standard .NET classes.
+    /// </summary>
     public class StandardHelper : IXmlPersistableProvider<Point>, IXmlPersistableProvider<PointF>,
         IXmlPersistableProvider<Rectangle>, IXmlPersistableProvider<RectangleF>,
         IXmlPersistableProvider<Image>, IXmlPersistableProvider<System.Int16>, IXmlPersistableProvider<System.Int32>, IXmlPersistableProvider<System.Int64>
@@ -28,8 +56,10 @@ namespace BASeCamp.Elementizer
         public static StandardHelper Static = new StandardHelper();
 
         #region generic helpers
-
-        private static Dictionary<Type, object> SerializationHelpers = new Dictionary<Type, object>()
+        /// <summary>
+        /// Stores our list of registered SerializationHelpers. Value should be an IXMLPersistableProvider&lt;T&gt; where T is the same type as the Type used for the Key.
+        /// </summary>
+        private static readonly Dictionary<Type, object> SerializationHelpers = new Dictionary<Type, object>()
         {
             {typeof (Image), Static},
             {typeof (Rectangle), Static},
