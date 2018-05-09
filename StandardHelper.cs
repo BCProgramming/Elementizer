@@ -194,8 +194,8 @@ namespace BASeCamp.Elementizer
                 
                 MethodInfo KeyMethod = SaveElementMethod.MakeGenericMethod(keyiterate.GetType());
                 MethodInfo ValueMethod = SaveElementMethod.MakeGenericMethod(ValueItem.GetType());
-                object[] keyparams = new object[] { keyiterate, "Key", null };
-                object[] valueparams = new object[] {ValueItem,"Value",null};
+                object[] keyparams = new object[] { keyiterate, "Key", null,null };
+                object[] valueparams = new object[] {ValueItem,"Value",null,null};
                 XElement KeyData = (XElement)KeyMethod.Invoke(null,keyparams);
                 XElement ValueData = (XElement)ValueMethod.Invoke(null,valueparams);
 
