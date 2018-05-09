@@ -173,7 +173,10 @@ namespace BASeCamp.Elementizer
                 }
 
                 //alright- first, read in this element.
-                T readresult = StandardHelper.ReadElement<T>(ReadElement.Elements().First(),pPersistenceData);
+                var firstelement = ReadElement.Elements().FirstOrDefault();
+                T readresult;
+                if (firstelement == null) readresult = default(T);
+                else readresult = StandardHelper.ReadElement<T>(ReadElement.Elements().First(),pPersistenceData);
                 //once read, assign it to the appropriate array index.
                 BuildArray.SetValue((object) readresult, elementindex);
             }
