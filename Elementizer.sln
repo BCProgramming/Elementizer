@@ -4,7 +4,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.26730.10
 MinimumVisualStudioVersion = 10.0.40219.1
 
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elementizer", "..\XMLSerialization\Elementizer.csproj", "{850A1563-AC23-4B60-BBCF-503B2BB69547}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elementizer", ".\Elementizer.csproj", "{850A1563-AC23-4B60-BBCF-503B2BB69547}"
 EndProject
 Global
 	GlobalSection(Performance) = preSolution
