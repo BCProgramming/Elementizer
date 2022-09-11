@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("BASeCamp Corporation")]
 [assembly: AssemblyProduct("XMLSerialization Library")]
-[assembly: AssemblyCopyright("Copyright ©  2014 BASeCamp")]
+[assembly: AssemblyCopyright("Copyright ©  2018 BASeCamp")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

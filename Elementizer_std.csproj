@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -8,11 +8,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>BASeCamp.Elementizer</RootNamespace>
     <AssemblyName>Elementizer</AssemblyName>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <Configurations>Debug;Release</Configurations>
-    <Platforms>AnyCPU;x64;x86</Platforms>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <EnableDefaultItems>false</EnableDefaultItems>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
     <NuGetPackageImportStamp>
@@ -98,8 +94,41 @@
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets. -->
-  
-
+  <Target Name="GetGitHash" BeforeTargets="WriteGitHash" Condition="'$(BuildHash)' == ''">
+    <PropertyGroup>
+      <!-- temp file for the git version (lives in "obj" folder)-->
+      <VerFile>$(IntermediateOutputPath)gitver</VerFile>
+    </PropertyGroup>
+    <!-- write the hash to the temp file.-->
+    <Exec Command="git -C &quot;$(ProjectDir.TrimEnd('\'))&quot; describe --long --always --dirty &gt; $(VerFile)" />
+    <!-- read the version into the GitVersion itemGroup-->
+    <ReadLinesFromFile File="$(VerFile)">
+      <Output TaskParameter="Lines" ItemName="GitVersion" />
+    </ReadLinesFromFile>
+    <!-- Set the BuildHash property to contain the GitVersion, if it wasn't already set.-->
+    <PropertyGroup>
+      <BuildHash>@(GitVersion)</BuildHash>
+    </PropertyGroup>
+  </Target>
+  <Target Name="WriteGitHash" BeforeTargets="CoreCompile">
+    <!-- names the obj/.../CustomAssemblyInfo.cs file -->
+    <PropertyGroup>
+      <CustomAssemblyInfoFile>$(IntermediateOutputPath)CustomAssemblyInfo.cs</CustomAssemblyInfoFile>
+    </PropertyGroup>
+    <!-- includes the CustomAssemblyInfo for compilation into your project -->
+    <ItemGroup>
+      <Compile Include="$(CustomAssemblyInfoFile)" />
+    </ItemGroup>
+    <!-- defines the AssemblyMetadata attribute that will be written -->
+    <ItemGroup>
+      <AssemblyAttributes Include="AssemblyMetadata">
+        <_Parameter1>GitHash</_Parameter1>
+        <_Parameter2>$(BuildHash)</_Parameter2>
+      </AssemblyAttributes>
+    </ItemGroup>
+    <!-- writes the attribute to the customAssemblyInfo file -->
+    <WriteCodeFragment Language="C#" OutputFile="$(CustomAssemblyInfoFile)" AssemblyAttributes="@(AssemblyAttributes)" />
+  </Target>
   <!--  <Target Name="BeforeBuild">
   
   </Target>-->

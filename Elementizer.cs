@@ -13,8 +13,17 @@ namespace BASeCamp.Elementizer
         public static string GetGitHash()
         {
             var asm = Assembly.GetExecutingAssembly();
-            var attrs = asm.GetCustomAttributes<AssemblyMetadataAttribute>();
-            return attrs.FirstOrDefault(a => a.Key == "GitHash")?.Value;
+            var attrs = asm.GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute),false);
+            foreach (var iterate in attrs)
+            {
+                if (iterate is AssemblyInformationalVersionAttribute asatr)
+                {
+                    if (asatr.InformationalVersion.StartsWith("GitHash;"))
+                        return asatr.InformationalVersion.Substring(8);
+
+                }
+            }
+            return null;
         }
     }
 }
