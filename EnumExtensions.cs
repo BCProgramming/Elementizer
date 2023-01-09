@@ -51,5 +51,6 @@ namespace BASeCamp.Elementizer
             return ToMask(Enumvalues);
 
         }
+        
     }
 }
