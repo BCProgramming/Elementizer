@@ -51,7 +51,7 @@ namespace BASeCamp.Elementizer
         IXmlPersistableProvider<System.Boolean>, IXmlPersistableProvider<Color>,
         IXmlPersistableProvider<Font>, IXmlPersistableProvider<ColorMatrix>,
         IXmlPersistableProvider<SolidBrush>, IXmlPersistableProvider<TextureBrush>, IXmlPersistableProvider<LinearGradientBrush>,
-        IXmlPersistableProvider<Matrix>, IXmlPersistableProvider<Blend>, IXmlPersistableProvider<ColorBlend>,IXmlPersistableProvider<IDictionary>,IXmlPersistableProvider<IList>
+        IXmlPersistableProvider<Matrix>, IXmlPersistableProvider<Blend>, IXmlPersistableProvider<ColorBlend>,IXmlPersistableProvider<IDictionary>,IXmlPersistableProvider<IList>,IXmlPersistableProvider<Type>
     {
         public static StandardHelper Static = new StandardHelper();
 
@@ -124,7 +124,23 @@ namespace BASeCamp.Elementizer
         }
         public static Type DefaultClassFinder(String pTypeName)
         {
-            return Type.GetType(pTypeName);
+            var resultvalue = Type.GetType(pTypeName);
+
+            if (resultvalue == null)
+            {
+
+                foreach (var iteratetype in Assembly.GetEntryAssembly().GetTypes())
+                {
+                    if (iteratetype.Name.Equals(pTypeName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        resultvalue = iteratetype;
+                        break;
+                    }
+                    
+                }
+            }
+
+            return resultvalue;
         }
         public delegate Type ClassFinderRoutine(String pTypeName);
         public static ClassFinderRoutine ClassFinder = DefaultClassFinder;
@@ -327,10 +343,11 @@ namespace BASeCamp.Elementizer
             bool SavingDimensions = true;
             while (SavingDimensions)
             {
+                
                 //Reflection "magic" is necessary here as far as I can tell; retrieve the SaveElement method of StandardHelper, then build a definition
                 //for the Generic Method using the Type of the System.Array Element Type we were passed.
                 MethodInfo GenericCall = typeof (StandardHelper).GetMethod("SaveElement").MakeGenericMethod(pArrayData.GetType().GetElementType());
-
+                
                 XElement ElementBuilt = (XElement) GenericCall.Invoke(null, new object[] {pArrayData.GetValue(indices), (Object) "Data", pPersistData,false });
                 //add the element, tagged with the Indices.
                 DimensionElement.Add(new XElement("Element", new XAttribute("Index", String.Join(",", from p in indices select p.ToString())), ElementBuilt));
@@ -1084,6 +1101,19 @@ namespace BASeCamp.Elementizer
             Image result = null;
             result = Image.FromStream(new MemoryStream(contents));
             return result;
+        }
+
+        public XElement SerializeObject(Type sourceItem, string pNodeName, object pPersistenceData)
+        {
+            return new XElement(pNodeName, new XAttribute("Name", sourceItem.FullName));
+        }
+
+        public Type DeSerializeObject(XElement xmlData, object pPersistenceData)
+        {
+            String FullTypeName = xmlData.GetAttributeString("Name");
+            var resultType = Assembly.GetEntryAssembly().GetType(FullTypeName);
+            return resultType;
+          
         }
 
         #endregion
