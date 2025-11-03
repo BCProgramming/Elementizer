@@ -125,21 +125,46 @@ namespace BASeCamp.Elementizer
         public static Type DefaultClassFinder(String pTypeName)
         {
             var resultvalue = Type.GetType(pTypeName);
-
+            bool IsFullName = pTypeName.Contains(".");
             if (resultvalue == null)
             {
-
-                foreach (var iteratetype in Assembly.GetEntryAssembly().GetTypes())
+                if (IsFullName) //if it contains a period it must be a fully specified type name,
                 {
-                    if (iteratetype.Name.Equals(pTypeName, StringComparison.OrdinalIgnoreCase))
+                    foreach (var iteratetype in Assembly.GetEntryAssembly().GetTypes())
                     {
-                        resultvalue = iteratetype;
-                        break;
-                    }
-                    
-                }
-            }
+                        //match on full name.
+                        if (iteratetype.FullName.Equals(pTypeName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            resultvalue = iteratetype;
+                            break;
+                        }
 
+
+
+                    }
+                }
+                else //if no period, let's still see if we can match the name. This won't be as exact and thus allow collisions, so isn't really great.
+                
+                {
+                    foreach (var iteratetype in Assembly.GetEntryAssembly().GetTypes())
+                    {
+                        //match on full name.
+                        if (iteratetype.Name.Equals(pTypeName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            resultvalue = iteratetype;
+                            break;
+                        }
+
+
+
+                    }
+                }
+                
+            }
+            if (resultvalue == null)
+            {
+                ;
+            }
             return resultvalue;
         }
         public delegate Type ClassFinderRoutine(String pTypeName);
@@ -405,6 +430,20 @@ namespace BASeCamp.Elementizer
 
             return elementresult;
         }
+        public static XElement SaveElementTypeReturnDirect(Type SourceType, Object SourceData, String pModeName, Object pPersistData, out Type pStoredType)
+        {
+            //call via reflection.
+            var methodGet = typeof(StandardHelper).GetMethod("SaveElementTypeReturn", BindingFlags.Static);
+            var CallGeneric = methodGet.MakeGenericMethod(SourceType);
+            Type ResultGet = null;
+            Object[] CallParameters = new object[] { SourceData, pModeName, pPersistData, ResultGet };
+
+            XElement CallResult = (XElement)CallGeneric.Invoke(null, CallParameters);
+            pStoredType = CallParameters[3] as Type;
+            return CallResult;
+
+        }
+        
         public static XElement SaveElementTypeReturn<T>(T SourceData, String pNodeName,Object pPersistData,out Type pStoredType)
         {
             pStoredType = typeof(T);
